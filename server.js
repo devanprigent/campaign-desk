@@ -1,0 +1,38 @@
+// Process entry point. Only decides how to serve: Vite middleware in dev,
+// built assets in prod. Everything app-specific lives in server/app.ts.
+import express from "express";
+
+const BUILD_PATH = "./build/server/index.js";
+const DEVELOPMENT = process.env.NODE_ENV === "development";
+const PORT = Number.parseInt(process.env.PORT || "3000");
+
+const app = express();
+app.disable("x-powered-by");
+
+if (DEVELOPMENT) {
+  const vite = await import("vite");
+  const viteDevServer = await vite.createServer({
+    server: { middlewareMode: true },
+  });
+  app.use(viteDevServer.middlewares);
+  app.use(async (req, res, next) => {
+    try {
+      const source = await viteDevServer.ssrLoadModule("./server/app.ts");
+      return await source.app(req, res, next);
+    } catch (error) {
+      if (error instanceof Error) viteDevServer.ssrFixStacktrace(error);
+      next(error);
+    }
+  });
+} else {
+  app.use(
+    "/assets",
+    express.static("build/client/assets", { immutable: true, maxAge: "1y" }),
+  );
+  app.use(express.static("build/client", { maxAge: "1h" }));
+  app.use(await import(BUILD_PATH).then((mod) => mod.app));
+}
+
+app.listen(PORT, () => {
+  console.log(`Campaign Desk running on http://localhost:${PORT}`);
+});
