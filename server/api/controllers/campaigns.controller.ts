@@ -3,8 +3,13 @@
 import type { Request, Response } from "express";
 
 import type { Campaign } from "../../models/campaign";
-import { createCampaign } from "../../services/campaign.service";
+import { createCampaign, listCampaigns } from "../../services/campaign.service";
 import { parseCreateCampaignBody } from "../../utils/parser";
+
+export async function list(req: Request<{ opportunityId: string }>, res: Response): Promise<void> {
+  const campaigns = await listCampaigns(req.params.opportunityId);
+  res.json({ items: campaigns.map(toJson) });
+}
 
 export async function create(req: Request<{ opportunityId: string }>, res: Response): Promise<void> {
   const input = parseCreateCampaignBody(req.body);

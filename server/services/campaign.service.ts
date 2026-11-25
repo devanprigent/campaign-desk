@@ -3,10 +3,21 @@
 import { fetchOpportunity, fetchToken } from "../clients/merkl";
 import { NotFoundError, RejectionError } from "../errors";
 import type { Campaign, NewCampaignInput } from "../models/campaign";
-import { insertCampaign } from "../repositories/campaign.repository";
+import {
+  findCampaignsByOpportunity,
+  insertCampaign,
+} from "../repositories/campaign.repository";
 import { checkMinimumDailyBudget, MIN_DAILY_REWARDS_USD } from "../rules/budget";
 import { computeFee } from "../rules/fee";
 import { checkSchedule } from "../rules/schedule";
+
+/**
+ * Reads our database only, without asking Merkl whether the opportunity
+ * exists: campaigns stay listable while Merkl is down. Unknown id → [].
+ */
+export async function listCampaigns(opportunityId: string): Promise<Campaign[]> {
+  return findCampaignsByOpportunity(opportunityId);
+}
 
 export async function createCampaign(
   opportunityId: string,

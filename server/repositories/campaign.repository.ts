@@ -13,6 +13,15 @@ export async function insertCampaign(data: CampaignToSave): Promise<Campaign> {
   return toCampaign(row);
 }
 
+/** Campaigns of one opportunity, newest first. */
+export async function findCampaignsByOpportunity(opportunityId: string): Promise<Campaign[]> {
+  const rows = await prisma.campaign.findMany({
+    where: { opportunityId },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map(toCampaign);
+}
+
 function toCampaign(row: CampaignRow): Campaign {
   const amount = BigInt(row.amount);
   const fee = BigInt(row.fee);
