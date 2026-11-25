@@ -11,6 +11,12 @@ For the cache, what should be the TTL ?
 
 # AI Section
 
+ne m'a pas mis de controllers au début
+
+dossier merkl au lieu de clients
+
+98 lignes de controlleurs contenant de la logique du genre parsing
+
 # My Feature
 
 // What I built and why I picked it
