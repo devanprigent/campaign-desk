@@ -1,9 +1,9 @@
-// Read-only access to Merkl's public API: HTTP call, timeout, validation of
-// the response (schemas/merkl.schema.ts) and cache. No business rules here.
+// Read-only access to Merkl's public API: HTTP call, timeout and validation of
+// the response (schemas/merkl.schema.ts), through the caches of merkl.cache.ts.
+// No business rules here.
 import { z } from "zod";
 
 import { MerklUnavailableError } from "../errors";
-import { TtlCache } from "../lib/cache";
 import type { Chain } from "../models/chain";
 import type { Token } from "../models/token";
 import type {
@@ -17,43 +17,16 @@ import {
   merklTokenSchema,
   type MerklTokenEntry,
 } from "../schemas/merkl.schema";
+import {
+  chainsCache,
+  opportunityCache,
+  opportunityListCache,
+  rewardTokensCache,
+  tokenCache,
+} from "./merkl.cache";
 
 const MERKL_API_URL = "https://api.merkl.xyz/v4";
 const REQUEST_TIMEOUT_MS = 3_000;
-
-// Caches hold validated, mapped data: an invalid response is never cached.
-const opportunityListCache = new TtlCache<Opportunity[]>({
-  ttlMs: 60_000, // opportunities change slowly
-  staleTtlMs: 60 * 60_000, // serve up to 1h old data while Merkl is down
-  maxEntries: 500, // one entry per filters + page combination
-});
-
-const opportunityCache = new TtlCache<Opportunity | null>({
-  ttlMs: 60_000,
-  staleTtlMs: 60 * 60_000,
-  maxEntries: 500,
-});
-
-const chainsCache = new TtlCache<Chain[]>({
-  ttlMs: 60 * 60_000, // chains are added rarely
-  staleTtlMs: 24 * 60 * 60_000,
-  maxEntries: 1,
-});
-
-// BR-1 values a campaign at the token's *current* price: never serve a stale
-// price (staleTtlMs = ttlMs), refuse with MerklUnavailableError instead.
-const tokenCache = new TtlCache<MerklTokenEntry[]>({
-  ttlMs: 60_000,
-  staleTtlMs: 60_000,
-  maxEntries: 500,
-});
-
-// Only feeds the token picker: BR-1 always re-reads the price via fetchToken.
-const rewardTokensCache = new TtlCache<MerklTokenEntry[]>({
-  ttlMs: 10 * 60_000,
-  staleTtlMs: 60 * 60_000,
-  maxEntries: 100, // one entry per chain
-});
 
 /**
  * GET a Merkl endpoint and validate the body with `schema`. Network errors,
