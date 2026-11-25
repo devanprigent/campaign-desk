@@ -16,9 +16,18 @@ export type Campaign = {
   createdAt: Date;
 };
 
+/**
+ * The JSON API sends the amount in the smallest unit; the web form sends it
+ * in tokens ("1000.5"). Only the service knows the token's decimals, so it is
+ * the one converting.
+ */
+export type CampaignAmount =
+  | { unit: "smallest"; value: bigint }
+  | { unit: "token"; value: string };
+
 export type NewCampaignInput = {
   tokenAddress: string;
-  amount: bigint;
+  amount: CampaignAmount;
   startAt: Date;
   endAt: Date;
 };

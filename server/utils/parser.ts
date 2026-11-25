@@ -46,42 +46,73 @@ export function parseOpportunityListQuery(query: Record<string, unknown>): {
 
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 const UNSIGNED_INTEGER_PATTERN = /^\d+$/;
+const DECIMAL_PATTERN = /^\d+(\.\d+)?$/;
+// What <input type="datetime-local"> submits: no time zone.
+const DATETIME_LOCAL_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 /**
- * Body of a campaign creation. `amount` is a string of digits in the token's
- * smallest unit (a JSON number would lose precision above 2^53).
+ * JSON body of a campaign creation. `amount` is a string of digits in the
+ * token's smallest unit (a JSON number would lose precision above 2^53).
+ * Dates are ISO 8601 with a time zone.
  */
 export function parseCreateCampaignBody(body: unknown): NewCampaignInput {
   const input = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
   const errors: FieldError[] = [];
 
-  const tokenAddress = input.tokenAddress;
-  if (typeof tokenAddress !== "string" || !ADDRESS_PATTERN.test(tokenAddress)) {
-    errors.push({ field: "tokenAddress", message: "must be a 0x-prefixed 20-byte hex address" });
-  }
-
+  const tokenAddress = parseAddress(input.tokenAddress, errors);
   const amount = input.amount;
-  let amountUnits = 0n;
-  if (typeof amount !== "string" || !UNSIGNED_INTEGER_PATTERN.test(amount) || BigInt(amount) === 0n) {
-    errors.push({
-      field: "amount",
-      message: "must be a positive integer string in the token's smallest unit",
-    });
-  } else {
-    amountUnits = BigInt(amount);
+  const amountIsValid =
+    typeof amount === "string" && UNSIGNED_INTEGER_PATTERN.test(amount) && BigInt(amount) > 0n;
+  if (!amountIsValid) {
+    errors.push({ field: "amount", message: "must be a positive integer string in the token's smallest unit" });
   }
+  const startAt = parseIsoDate(input.startAt, "startAt", errors);
+  const endAt = parseIsoDate(input.endAt, "endAt", errors);
 
-  const startAt = parseDate(input.startAt, "startAt", errors);
-  const endAt = parseDate(input.endAt, "endAt", errors);
-
-  if (errors.length > 0 || !startAt || !endAt) throw new ValidationError(errors);
-  return { tokenAddress: tokenAddress as string, amount: amountUnits, startAt, endAt };
+  if (errors.length > 0 || !tokenAddress || !startAt || !endAt) throw new ValidationError(errors);
+  return { tokenAddress, amount: { unit: "smallest", value: BigInt(amount as string) }, startAt, endAt };
 }
 
-function parseDate(value: unknown, field: string, errors: FieldError[]): Date | undefined {
+/**
+ * HTML form fields of a campaign creation. `amount` is in tokens ("1000.5");
+ * dates come from datetime-local inputs and are read as UTC.
+ */
+export function parseCreateCampaignForm(form: Record<string, unknown>): NewCampaignInput {
+  const errors: FieldError[] = [];
+
+  const tokenAddress = parseAddress(form.tokenAddress, errors);
+  const amount = form.amount;
+  const amountIsValid = typeof amount === "string" && DECIMAL_PATTERN.test(amount) && /[1-9]/.test(amount);
+  if (!amountIsValid) {
+    errors.push({ field: "amount", message: "must be a positive number, e.g. 1000 or 1000.5" });
+  }
+  const startAt = parseUtcDateTimeLocal(form.startAt, "startAt", errors);
+  const endAt = parseUtcDateTimeLocal(form.endAt, "endAt", errors);
+
+  if (errors.length > 0 || !tokenAddress || !startAt || !endAt) throw new ValidationError(errors);
+  return { tokenAddress, amount: { unit: "token", value: amount as string }, startAt, endAt };
+}
+
+function parseAddress(value: unknown, errors: FieldError[]): string | undefined {
+  if (typeof value === "string" && ADDRESS_PATTERN.test(value)) return value;
+  errors.push({ field: "tokenAddress", message: "must be a 0x-prefixed 20-byte hex address" });
+  return undefined;
+}
+
+function parseIsoDate(value: unknown, field: string, errors: FieldError[]): Date | undefined {
   const date = typeof value === "string" ? new Date(value) : undefined;
   if (!date || Number.isNaN(date.getTime())) {
     errors.push({ field, message: "must be an ISO 8601 date, e.g. 2026-12-01T00:00:00Z" });
+    return undefined;
+  }
+  return date;
+}
+
+function parseUtcDateTimeLocal(value: unknown, field: string, errors: FieldError[]): Date | undefined {
+  const date =
+    typeof value === "string" && DATETIME_LOCAL_PATTERN.test(value) ? new Date(`${value}Z`) : undefined;
+  if (!date || Number.isNaN(date.getTime())) {
+    errors.push({ field, message: "must be a date and time" });
     return undefined;
   }
   return date;

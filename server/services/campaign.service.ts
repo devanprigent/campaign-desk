@@ -2,6 +2,7 @@
 // the JSON API and the web form alike, so every rule applies on every path.
 import { fetchOpportunity, fetchToken } from "../clients/merkl";
 import { NotFoundError, RejectionError } from "../errors";
+import { toSmallestUnit } from "../lib/units";
 import type { Campaign, NewCampaignInput } from "../models/campaign";
 import {
   findCampaignsByOpportunity,
@@ -38,8 +39,18 @@ export async function createCampaign(
     ]);
   }
 
+  const amount =
+    input.amount.unit === "smallest"
+      ? input.amount.value
+      : toSmallestUnit(input.amount.value, token.decimals);
+  if (amount === null) {
+    throw new RejectionError([
+      { field: "amount", message: `${token.symbol} supports at most ${token.decimals} decimals` },
+    ]);
+  }
+
   const budget = checkMinimumDailyBudget({
-    amount: input.amount,
+    amount,
     decimals: token.decimals,
     priceUsd: token.priceUsd,
     startAt: input.startAt,
@@ -68,8 +79,8 @@ export async function createCampaign(
     tokenAddress: token.address,
     tokenSymbol: token.symbol,
     tokenDecimals: token.decimals,
-    amount: input.amount,
-    fee: computeFee(input.amount),
+    amount,
+    fee: computeFee(amount),
     tokenPriceUsd: token.priceUsd as number, // non-null: BR-1 passed
     startAt: input.startAt,
     endAt: input.endAt,

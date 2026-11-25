@@ -70,6 +70,13 @@ const tokenCache = new TtlCache<MerklToken[]>({
   maxEntries: 500,
 });
 
+// Only feeds the token picker: BR-1 always re-reads the price via fetchToken.
+const rewardTokensCache = new TtlCache<MerklToken[]>({
+  ttlMs: 10 * 60_000,
+  staleTtlMs: 60 * 60_000,
+  maxEntries: 100, // one entry per chain
+});
+
 async function getJson<T>(path: string, query: URLSearchParams): Promise<T>;
 async function getJson<T>(
   path: string,
@@ -175,7 +182,24 @@ export async function fetchToken(chainId: number, address: string): Promise<Toke
     getJson<MerklToken[]>("/tokens", query),
   );
   const raw = entries.find((t) => t.verified) ?? entries[0];
-  if (!raw) return null;
+  return raw ? toToken(raw) : null;
+}
+
+/** Tokens Merkl accepts as campaign rewards on a chain, one per address. */
+export async function fetchRewardTokens(chainId: number): Promise<Token[]> {
+  const entries = await rewardTokensCache.getOrLoad(String(chainId), () =>
+    getJson<MerklToken[]>(`/tokens/reward/${chainId}`, new URLSearchParams()),
+  );
+  const byAddress = new Map<string, MerklToken>();
+  for (const entry of entries) {
+    const key = entry.address.toLowerCase();
+    const kept = byAddress.get(key);
+    if (!kept || (!kept.verified && entry.verified)) byAddress.set(key, entry);
+  }
+  return [...byAddress.values()].map(toToken);
+}
+
+function toToken(raw: MerklToken): Token {
   return {
     chainId: raw.chainId,
     address: raw.address,

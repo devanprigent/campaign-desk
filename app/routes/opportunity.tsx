@@ -1,13 +1,17 @@
-// Opportunity page: Merkl data for one opportunity and the campaigns created
-// on it. The loader calls the same services as the JSON API.
-import { data, Link } from "react-router";
+// Opportunity page: Merkl data for one opportunity, the campaigns created on
+// it, and the form to create one. The loader and the action are this page's
+// controllers: they call the same parser and services as the JSON API.
+import { data, Link, redirect } from "react-router";
 
 import { MerklUnavailableError } from "../../server/clients/merkl";
-import { NotFoundError } from "../../server/errors";
+import { NotFoundError, RejectionError, ValidationError } from "../../server/errors";
 import type { Campaign } from "../../server/models/campaign";
 import type { Opportunity } from "../../server/models/opportunity";
-import { listCampaigns } from "../../server/services/campaign.service";
+import { createCampaign, listCampaigns } from "../../server/services/campaign.service";
 import { getOpportunity } from "../../server/services/opportunity.service";
+import { listRewardTokens } from "../../server/services/token.service";
+import { parseCreateCampaignForm } from "../../server/utils/parser";
+import { CampaignForm, type CampaignFormResult } from "../components/campaign-form";
 import { formatApr, formatDateTime, formatUnits, formatUsd } from "../utils/format";
 import type { Route } from "./+types/opportunity";
 
@@ -16,14 +20,45 @@ export function meta({ loaderData }: Route.MetaArgs) {
   return [{ title: `${name} · Campaign Desk` }];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
   // In parallel. Campaigns come from our database only, so they are still
   // shown when Merkl is down.
   const [opportunity, campaigns] = await Promise.all([
     loadOpportunity(params.opportunityId),
     listCampaigns(params.opportunityId),
   ]);
-  return { opportunity, campaigns };
+  // Without the token list, the form falls back to a plain address input.
+  const rewardTokens =
+    opportunity.status === "ok"
+      ? await listRewardTokens(opportunity.value.chainId).catch(() => null)
+      : null;
+  // Set by the action's redirect after a successful creation.
+  const createdId = new URL(request.url).searchParams.get("created");
+  const created = campaigns.find((c) => c.id === createdId) ?? null;
+  return { opportunity, campaigns, rewardTokens, created };
+}
+
+export async function action({ params, request }: Route.ActionArgs) {
+  const values: Record<string, string> = {};
+  for (const [name, value] of await request.formData()) {
+    if (typeof value === "string") values[name] = value;
+  }
+  try {
+    const campaign = await createCampaign(params.opportunityId, parseCreateCampaignForm(values));
+    // Post/Redirect/Get: a refresh will not submit the form again.
+    return redirect(`/opportunities/${params.opportunityId}?created=${campaign.id}`);
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof RejectionError) {
+      const status = error instanceof ValidationError ? 400 : 422;
+      return data<CampaignFormResult>({ values, fields: error.fields }, { status });
+    }
+    if (error instanceof MerklUnavailableError) {
+      const formError = "Merkl is unavailable: the token price cannot be checked. Try again in a moment.";
+      return data<CampaignFormResult>({ values, fields: [], formError }, { status: 503 });
+    }
+    if (error instanceof NotFoundError) throw data("Opportunity not found", { status: 404 });
+    throw error;
+  }
 }
 
 async function loadOpportunity(id: string) {
@@ -38,8 +73,8 @@ async function loadOpportunity(id: string) {
   }
 }
 
-export default function OpportunityPage({ loaderData }: Route.ComponentProps) {
-  const { opportunity, campaigns } = loaderData;
+export default function OpportunityPage({ loaderData, actionData }: Route.ComponentProps) {
+  const { opportunity, campaigns, rewardTokens, created } = loaderData;
   return (
     <main>
       <p>
@@ -51,8 +86,21 @@ export default function OpportunityPage({ loaderData }: Route.ComponentProps) {
         <p role="alert">Merkl is unavailable right now: opportunity details cannot be shown.</p>
       )}
       <h2>Campaigns</h2>
+      {created && <CreatedBanner campaign={created} />}
+      {/* Creating needs Merkl (opportunity chain, token price): no form without it. */}
+      {opportunity.status === "ok" && <CampaignForm tokens={rewardTokens} result={actionData} />}
       <CampaignTable campaigns={campaigns} />
     </main>
+  );
+}
+
+function CreatedBanner({ campaign: c }: { campaign: Campaign }) {
+  const amount = (value: bigint) => `${formatUnits(value, c.tokenDecimals)} ${c.tokenSymbol}`;
+  return (
+    <p role="status">
+      Campaign created: {amount(c.amount)} of rewards + {amount(c.fee)} fee ={" "}
+      <strong>{amount(c.totalCost)} total cost</strong>.
+    </p>
   );
 }
 
