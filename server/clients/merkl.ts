@@ -1,5 +1,7 @@
-// Read-only access to Merkl's public API: HTTP call, timeout, cache, and
-// mapping from Merkl's JSON to our types. No business rules here.
+// Read-only access to Merkl's public API: HTTP call, timeout, validation of
+// the response (schemas/merkl.schema.ts) and cache. No business rules here.
+import { z } from "zod";
+
 import { MerklUnavailableError } from "../errors";
 import { TtlCache } from "../lib/cache";
 import type { Chain } from "../models/chain";
@@ -9,79 +11,72 @@ import type {
   OpportunityFilters,
   Pagination,
 } from "../models/opportunity";
+import {
+  merklChainSchema,
+  merklOpportunitySchema,
+  merklTokenSchema,
+  type MerklTokenEntry,
+} from "../schemas/merkl.schema";
 
 const MERKL_API_URL = "https://api.merkl.xyz/v4";
 const REQUEST_TIMEOUT_MS = 3_000;
 
-// Subset of Merkl's opportunity payload that we actually read.
-type MerklOpportunity = {
-  id: string;
-  name: string;
-  chainId: number;
-  chain?: { name?: string };
-  protocol?: { name?: string } | null;
-  action: string;
-  status: string;
-  tvl?: number;
-  apr?: number;
-  dailyRewards?: number;
-};
-
-const opportunityListCache = new TtlCache<MerklOpportunity[]>({
+// Caches hold validated, mapped data: an invalid response is never cached.
+const opportunityListCache = new TtlCache<Opportunity[]>({
   ttlMs: 60_000, // opportunities change slowly
   staleTtlMs: 60 * 60_000, // serve up to 1h old data while Merkl is down
   maxEntries: 500, // one entry per filters + page combination
 });
 
-type MerklChain = { id: number; name: string };
-
-const chainsCache = new TtlCache<MerklChain[]>({
-  ttlMs: 60 * 60_000, // chains are added rarely
-  staleTtlMs: 24 * 60 * 60_000,
-  maxEntries: 1,
-});
-
-type MerklToken = {
-  chainId: number;
-  address: string;
-  symbol: string;
-  decimals: number;
-  verified?: boolean;
-  price?: number | null;
-};
-
-const opportunityCache = new TtlCache<MerklOpportunity | null>({
+const opportunityCache = new TtlCache<Opportunity | null>({
   ttlMs: 60_000,
   staleTtlMs: 60 * 60_000,
   maxEntries: 500,
 });
 
+const chainsCache = new TtlCache<Chain[]>({
+  ttlMs: 60 * 60_000, // chains are added rarely
+  staleTtlMs: 24 * 60 * 60_000,
+  maxEntries: 1,
+});
+
 // BR-1 values a campaign at the token's *current* price: never serve a stale
 // price (staleTtlMs = ttlMs), refuse with MerklUnavailableError instead.
-const tokenCache = new TtlCache<MerklToken[]>({
+const tokenCache = new TtlCache<MerklTokenEntry[]>({
   ttlMs: 60_000,
   staleTtlMs: 60_000,
   maxEntries: 500,
 });
 
 // Only feeds the token picker: BR-1 always re-reads the price via fetchToken.
-const rewardTokensCache = new TtlCache<MerklToken[]>({
+const rewardTokensCache = new TtlCache<MerklTokenEntry[]>({
   ttlMs: 10 * 60_000,
   staleTtlMs: 60 * 60_000,
   maxEntries: 100, // one entry per chain
 });
 
-async function getJson<T>(path: string, query: URLSearchParams): Promise<T>;
-async function getJson<T>(
+/**
+ * GET a Merkl endpoint and validate the body with `schema`. Network errors,
+ * timeouts, 5xx and responses that do not match the schema are all
+ * MerklUnavailableError: an unusable answer is treated like no answer.
+ */
+async function getJson<S extends z.ZodType>(
   path: string,
   query: URLSearchParams,
+  schema: S,
+): Promise<z.output<S>>;
+async function getJson<S extends z.ZodType>(
+  path: string,
+  query: URLSearchParams,
+  schema: S,
   options: { notFoundAsNull: true },
-): Promise<T | null>;
-async function getJson<T>(
+): Promise<z.output<S> | null>;
+async function getJson<S extends z.ZodType>(
   path: string,
   query: URLSearchParams,
+  schema: S,
   options?: { notFoundAsNull: true },
-): Promise<T | null> {
+): Promise<z.output<S> | null> {
   let response: Response;
   try {
     response = await fetch(`${MERKL_API_URL}${path}?${query}`, {
@@ -100,22 +95,20 @@ async function getJson<T>(
     // A 4xx means we built a bad request: a bug on our side, not an outage.
     throw new Error(`Merkl rejected ${path}?${query}: ${response.status} ${await response.text()}`);
   }
-  return (await response.json()) as T;
-}
 
-function toOpportunity(raw: MerklOpportunity): Opportunity {
-  return {
-    id: raw.id,
-    name: raw.name,
-    chainId: raw.chainId,
-    chainName: raw.chain?.name ?? String(raw.chainId),
-    protocolName: raw.protocol?.name ?? null,
-    action: raw.action,
-    status: raw.status,
-    tvlUsd: raw.tvl ?? 0,
-    apr: raw.apr ?? 0,
-    dailyRewardsUsd: raw.dailyRewards ?? 0,
-  };
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    console.warn(`Merkl ${path} returned a non-JSON body`);
+    throw new MerklUnavailableError(error);
+  }
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    console.warn(`Merkl ${path} returned an unexpected shape:`, z.prettifyError(parsed.error));
+    throw new MerklUnavailableError(parsed.error);
+  }
+  return parsed.data;
 }
 
 /**
@@ -136,33 +129,28 @@ export async function fetchOpportunities(
   if (filters.minTvlUsd !== undefined) query.set("minimumTvl", String(filters.minTvlUsd));
   query.sort(); // same filters in any order → same cache key
 
-  const raw = await opportunityListCache.getOrLoad(query.toString(), () =>
-    getJson<MerklOpportunity[]>("/opportunities", query),
+  const opportunities = await opportunityListCache.getOrLoad(query.toString(), () =>
+    getJson("/opportunities", query, z.array(merklOpportunitySchema)),
   );
-
   return {
-    items: raw.slice(0, pageSize).map(toOpportunity),
-    hasNextPage: raw.length > pageSize,
+    items: opportunities.slice(0, pageSize),
+    hasNextPage: opportunities.length > pageSize,
   };
-}
-
-export async function fetchChains(): Promise<Chain[]> {
-  const raw = await chainsCache.getOrLoad("all", () =>
-    getJson<MerklChain[]>("/chains", new URLSearchParams()),
-  );
-  return raw.map(({ id, name }) => ({ id, name }));
 }
 
 /** One opportunity by Merkl id, or null if Merkl does not know it. */
 export async function fetchOpportunity(id: string): Promise<Opportunity | null> {
-  const raw = await opportunityCache.getOrLoad(id, () =>
-    getJson<MerklOpportunity>(
-      `/opportunities/${encodeURIComponent(id)}`,
-      new URLSearchParams(),
-      { notFoundAsNull: true },
-    ),
+  return opportunityCache.getOrLoad(id, () =>
+    getJson(`/opportunities/${encodeURIComponent(id)}`, new URLSearchParams(), merklOpportunitySchema, {
+      notFoundAsNull: true,
+    }),
   );
-  return raw ? toOpportunity(raw) : null;
+}
+
+export async function fetchChains(): Promise<Chain[]> {
+  return chainsCache.getOrLoad("all", () =>
+    getJson("/chains", new URLSearchParams(), z.array(merklChainSchema)),
+  );
 }
 
 /**
@@ -173,32 +161,21 @@ export async function fetchOpportunity(id: string): Promise<Opportunity | null> 
 export async function fetchToken(chainId: number, address: string): Promise<Token | null> {
   const query = new URLSearchParams({ chainId: String(chainId), address });
   const entries = await tokenCache.getOrLoad(`${chainId}:${address.toLowerCase()}`, () =>
-    getJson<MerklToken[]>("/tokens", query),
+    getJson("/tokens", query, z.array(merklTokenSchema)),
   );
-  const raw = entries.find((t) => t.verified) ?? entries[0];
-  return raw ? toToken(raw) : null;
+  return (entries.find((e) => e.verified) ?? entries[0])?.token ?? null;
 }
 
 /** Tokens Merkl accepts as campaign rewards on a chain, one per address. */
 export async function fetchRewardTokens(chainId: number): Promise<Token[]> {
   const entries = await rewardTokensCache.getOrLoad(String(chainId), () =>
-    getJson<MerklToken[]>(`/tokens/reward/${chainId}`, new URLSearchParams()),
+    getJson(`/tokens/reward/${chainId}`, new URLSearchParams(), z.array(merklTokenSchema)),
   );
-  const byAddress = new Map<string, MerklToken>();
+  const byAddress = new Map<string, MerklTokenEntry>();
   for (const entry of entries) {
-    const key = entry.address.toLowerCase();
+    const key = entry.token.address.toLowerCase();
     const kept = byAddress.get(key);
     if (!kept || (!kept.verified && entry.verified)) byAddress.set(key, entry);
   }
-  return [...byAddress.values()].map(toToken);
-}
-
-function toToken(raw: MerklToken): Token {
-  return {
-    chainId: raw.chainId,
-    address: raw.address,
-    symbol: raw.symbol,
-    decimals: raw.decimals,
-    priceUsd: typeof raw.price === "number" ? raw.price : null,
-  };
+  return [...byAddress.values()].map((e) => e.token);
 }

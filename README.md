@@ -6,7 +6,7 @@
 
 No eligible TVL ?
 
-For the cache, what should be the TTL ? 
+For the cache, what should be the TTL ?  Decided 1mn.
 
 
 # AI Section
