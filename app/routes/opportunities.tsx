@@ -14,6 +14,7 @@ import {
 import { listChains } from "../../server/services/chain.service";
 import { listOpportunities } from "../../server/services/opportunity.service";
 import { parseOpportunityListQuery } from "../../server/utils/parser";
+import { formatApr, formatUsd } from "../utils/format";
 import type { Route } from "./+types/opportunities";
 
 type Query = Record<string, string>;
@@ -175,25 +176,19 @@ function OpportunityTable({ items }: { items: Opportunity[] }) {
       <tbody>
         {items.map((o) => (
           <tr key={o.id}>
-            <td>{o.name}</td>
+            <td>
+              <Link to={`/opportunities/${o.id}`}>{o.name}</Link>
+            </td>
             <td>{o.chainName}</td>
             <td>{o.protocolName ?? "—"}</td>
             <td>{o.action}</td>
             <td>{o.status}</td>
-            <td>{usd.format(o.tvlUsd)}</td>
-            <td>{o.apr.toFixed(2)}%</td>
-            <td>{usd.format(o.dailyRewardsUsd)}</td>
+            <td>{formatUsd(o.tvlUsd)}</td>
+            <td>{formatApr(o.apr)}</td>
+            <td>{formatUsd(o.dailyRewardsUsd)}</td>
           </tr>
         ))}
       </tbody>
     </table>
   );
 }
-
-// Fixed locale so the server-rendered HTML matches what the browser hydrates.
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
