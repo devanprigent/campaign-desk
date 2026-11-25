@@ -1,7 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
-import type { FieldError } from "../../server/errors";
-import type { Token } from "../../server/models/token";
+import type { FieldError } from "../../../server/errors";
+import type { Token } from "../../../server/models/token";
 
 export type CampaignFormResult = {
   values: Record<string, string>;
