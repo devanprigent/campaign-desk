@@ -1,5 +1,6 @@
 // Read-only access to Merkl's public API: HTTP call, timeout, cache, and
 // mapping from Merkl's JSON to our types. No business rules here.
+import { MerklUnavailableError } from "../errors";
 import { TtlCache } from "../lib/cache";
 import type { Chain } from "../models/chain";
 import type { Token } from "../models/token";
@@ -11,13 +12,6 @@ import type {
 
 const MERKL_API_URL = "https://api.merkl.xyz/v4";
 const REQUEST_TIMEOUT_MS = 3_000;
-
-export class MerklUnavailableError extends Error {
-  constructor(cause: unknown) {
-    super("Merkl API is unavailable", { cause });
-    this.name = "MerklUnavailableError";
-  }
-}
 
 // Subset of Merkl's opportunity payload that we actually read.
 type MerklOpportunity = {

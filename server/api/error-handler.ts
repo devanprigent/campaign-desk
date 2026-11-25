@@ -3,8 +3,7 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
 import { z } from "zod";
 
-import { MerklUnavailableError } from "../clients/merkl";
-import { NotFoundError, RejectionError, toFieldErrors } from "../errors";
+import { MerklUnavailableError, NotFoundError, RejectionError, toFieldErrors } from "../errors";
 
 export const notFoundHandler: RequestHandler = (req, res) => {
   res.status(404).json({

@@ -3,8 +3,12 @@
 // controllers: they use the server's schemas and the same services as the JSON API.
 import { data, Link, redirect } from "react-router";
 
-import { MerklUnavailableError } from "../../server/clients/merkl";
-import { NotFoundError, RejectionError, toFieldErrors } from "../../server/errors";
+import {
+  MerklUnavailableError,
+  NotFoundError,
+  RejectionError,
+  toFieldErrors,
+} from "../../server/errors";
 import type { Campaign } from "../../server/models/campaign";
 import type { Opportunity } from "../../server/models/opportunity";
 import { createCampaignFormSchema } from "../../server/schemas/campaign.schema";

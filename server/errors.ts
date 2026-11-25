@@ -20,6 +20,14 @@ export class NotFoundError extends Error {
   }
 }
 
+/** Merkl timed out, was unreachable or answered 5xx. Thrown by clients/merkl.ts. */
+export class MerklUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super("Merkl API is unavailable", { cause });
+    this.name = "MerklUnavailableError";
+  }
+}
+
 /** One FieldError per field (its first issue), so each field shows one message. */
 export function toFieldErrors(error: z.ZodError): FieldError[] {
   const fields: FieldError[] = [];

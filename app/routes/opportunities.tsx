@@ -3,8 +3,7 @@
 // Filters and pagination live in the URL, so the page works without JS.
 import { Form, Link, useSubmit } from "react-router";
 
-import { MerklUnavailableError } from "../../server/clients/merkl";
-import { toFieldErrors } from "../../server/errors";
+import { MerklUnavailableError, toFieldErrors } from "../../server/errors";
 import type { Chain } from "../../server/models/chain";
 import {
   OPPORTUNITY_ACTIONS,
