@@ -1,6 +1,7 @@
 // Opportunity use cases. Callers (API controllers, React Router loaders)
 // go through here and never call the Merkl client directly.
-import { fetchOpportunities } from "../clients/merkl";
+import { fetchOpportunities, fetchOpportunity } from "../clients/merkl";
+import { NotFoundError } from "../errors";
 import type {
   Opportunity,
   OpportunityFilters,
@@ -14,4 +15,10 @@ export async function listOpportunities(
 ): Promise<Page<Opportunity>> {
   const { items, hasNextPage } = await fetchOpportunities(filters, pagination);
   return { items, hasNextPage, ...pagination };
+}
+
+export async function getOpportunity(id: string): Promise<Opportunity> {
+  const opportunity = await fetchOpportunity(id);
+  if (!opportunity) throw new NotFoundError("Opportunity", id);
+  return opportunity;
 }

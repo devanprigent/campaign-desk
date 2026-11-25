@@ -6,3 +6,4 @@ import * as opportunitiesController from "../controllers/opportunities.controlle
 export const opportunitiesRoutes = Router();
 
 opportunitiesRoutes.get("/", opportunitiesController.list);
+opportunitiesRoutes.get("/:opportunityId", opportunitiesController.get);
