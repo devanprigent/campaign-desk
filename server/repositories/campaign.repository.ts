@@ -1,5 +1,3 @@
-// Campaign persistence. The only module that talks to Prisma about campaigns;
-// converts between database rows (amounts as text) and our Campaign model.
 import type { Campaign as CampaignRow } from "../../generated/prisma/client";
 import { prisma } from "../db/client";
 import type { Campaign } from "../models/campaign";
@@ -13,7 +11,6 @@ export async function insertCampaign(data: CampaignToSave): Promise<Campaign> {
   return toCampaign(row);
 }
 
-/** Campaigns of one opportunity, newest first. */
 export async function findCampaignsByOpportunity(opportunityId: string): Promise<Campaign[]> {
   const rows = await prisma.campaign.findMany({
     where: { opportunityId },

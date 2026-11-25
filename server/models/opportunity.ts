@@ -1,6 +1,3 @@
-// Our own shape of an opportunity. The rest of the app depends on this type,
-// never on Merkl's raw JSON, so a change at Merkl only touches the client.
-
 export const OPPORTUNITY_ACTIONS = [
   "POOL",
   "HOLD",
@@ -36,7 +33,7 @@ export type OpportunityFilters = {
 };
 
 export type Pagination = {
-  page: number; // 0-based
+  page: number;
   pageSize: number;
 };
 

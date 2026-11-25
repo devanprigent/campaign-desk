@@ -1,11 +1,3 @@
-// Generic in-process TTL cache. Knows nothing about Merkl.
-//
-// - Fresh entry (younger than ttlMs): returned without calling the loader.
-// - Expired entry: the loader is called. If it fails and the entry is younger
-//   than staleTtlMs, the stale value is returned instead of the error.
-// - Concurrent misses on the same key share one loader call.
-// - At most maxEntries keys; the oldest inserted key is evicted first.
-
 type Entry<T> = { value: T; storedAt: number };
 
 export type CacheOptions = {
@@ -48,7 +40,7 @@ export class TtlCache<T> {
   }
 
   private set(key: string, value: T): void {
-    this.entries.delete(key); // re-insert so the key becomes the newest
+    this.entries.delete(key);
     this.entries.set(key, { value, storedAt: this.now() });
     if (this.entries.size > this.options.maxEntries) {
       const oldestKey = this.entries.keys().next().value;

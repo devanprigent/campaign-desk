@@ -1,6 +1,3 @@
-// Opportunity page: Merkl data for one opportunity, the campaigns created on
-// it, and the form to create one. The loader and the action are this page's
-// controllers: they use the server's schemas and the same services as the JSON API.
 import { data, Link, redirect } from "react-router";
 
 import {
@@ -25,18 +22,14 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  // In parallel. Campaigns come from our database only, so they are still
-  // shown when Merkl is down.
   const [opportunity, campaigns] = await Promise.all([
     loadOpportunity(params.opportunityId),
     listCampaigns(params.opportunityId),
   ]);
-  // Without the token list, the form falls back to a plain address input.
   const rewardTokens =
     opportunity.status === "ok"
       ? await listRewardTokens(opportunity.value.chainId).catch(() => null)
       : null;
-  // Set by the action's redirect after a successful creation.
   const createdId = new URL(request.url).searchParams.get("created");
   const created = campaigns.find((c) => c.id === createdId) ?? null;
   return { opportunity, campaigns, rewardTokens, created };
@@ -53,7 +46,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
   try {
     const campaign = await createCampaign(params.opportunityId, parsed.data);
-    // Post/Redirect/Get: a refresh will not submit the form again.
     return redirect(`/opportunities/${params.opportunityId}?created=${campaign.id}`);
   } catch (error) {
     if (error instanceof RejectionError) {
@@ -73,7 +65,7 @@ async function loadOpportunity(id: string) {
     return { status: "ok" as const, value: await getOpportunity(id) };
   } catch (error) {
     if (error instanceof NotFoundError) {
-      throw data("Opportunity not found", { status: 404 }); // rendered by root ErrorBoundary
+      throw data("Opportunity not found", { status: 404 });
     }
     if (error instanceof MerklUnavailableError) return { status: "unavailable" as const };
     throw error;
@@ -94,7 +86,6 @@ export default function OpportunityPage({ loaderData, actionData }: Route.Compon
       )}
       <h2>Campaigns</h2>
       {created && <CreatedBanner campaign={created} />}
-      {/* Creating needs Merkl (opportunity chain, token price): no form without it. */}
       {opportunity.status === "ok" && <CampaignForm tokens={rewardTokens} result={actionData} />}
       <CampaignTable campaigns={campaigns} />
     </main>

@@ -1,4 +1,3 @@
-// Chain use cases: the list of chains offered by the chain filter.
 import { fetchChains } from "../clients/merkl";
 import type { Chain } from "../models/chain";
 

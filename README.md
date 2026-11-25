@@ -8,6 +8,8 @@ No eligible TVL ?
 
 For the cache, what should be the TTL ?  Decided 1mn.
 
+For the date, only day or also hours ?
+
 
 # AI Section
 
@@ -30,3 +32,9 @@ Use a dependency for the table
 // Add more query parameters to filter ?
 
 // Add a layer repository ?
+
+// Be able to search in the opportunity list, be able to search in the dropdowns.
+
+// Add monitoring.
+
+// Start and end should be in local time

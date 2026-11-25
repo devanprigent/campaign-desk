@@ -1,4 +1,3 @@
-// Single PrismaClient for the process. Only repositories should import this.
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 import { PrismaClient } from "../../generated/prisma/client";

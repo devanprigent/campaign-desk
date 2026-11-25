@@ -1,5 +1,3 @@
-// Wiring only: method + path → controller. Mounted under
-// /opportunities/:opportunityId/campaigns, hence mergeParams.
 import { Router } from "express";
 
 import * as campaignsController from "../controllers/campaigns.controller";

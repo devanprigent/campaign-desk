@@ -1,6 +1,3 @@
-// Shape of Merkl's responses. Validated at the boundary (clients/merkl.ts)
-// before anything is cached or used, and mapped to our own types, so the rest
-// of the app never sees Merkl's format. Unknown fields are dropped.
 import { z } from "zod";
 
 import type { Chain } from "../models/chain";
@@ -40,11 +37,6 @@ export const merklChainSchema = z.object({
   name: z.string(),
 }) satisfies z.ZodType<Chain>;
 
-/**
- * Keeps `verified` next to the token: Merkl may return one address several
- * times, and the client prefers the verified entry. `decimals` and `price`
- * feed BR-1 and BR-2, hence the strict checks.
- */
 export const merklTokenSchema = z
   .object({
     chainId: z.number().int(),
@@ -52,8 +44,6 @@ export const merklTokenSchema = z
     symbol: z.string(),
     decimals: z.number().int().min(0).max(255),
     verified: z.boolean().optional(),
-    // An unusable price (negative, not a number) counts as no price: BR-1
-    // then refuses the token instead of the whole token list failing.
     price: z.number().nonnegative().nullish().catch(null),
   })
   .transform(({ verified, price, ...token }) => ({

@@ -1,5 +1,3 @@
-// HTTP ↔ use case translation for campaigns: parse the body, call the
-// service, send JSON. Amounts go out as strings (JSON has no bigint).
 import type { Request, Response } from "express";
 
 import type { Campaign } from "../../models/campaign";

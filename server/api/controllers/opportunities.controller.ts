@@ -1,5 +1,3 @@
-// HTTP ↔ use case translation for opportunities: parse the query string,
-// call the service, send JSON. No business logic, no Merkl calls.
 import type { Request, Response } from "express";
 
 import { getOpportunity, listOpportunities } from "../../services/opportunity.service";

@@ -1,5 +1,3 @@
-// Campaign use cases. The single entry point for creating a campaign, used by
-// the JSON API and the web form alike, so every rule applies on every path.
 import { fetchOpportunity, fetchToken } from "../clients/merkl";
 import { NotFoundError, RejectionError } from "../errors";
 import { toSmallestUnit } from "../lib/units";
@@ -12,10 +10,6 @@ import { checkMinimumDailyBudget, MIN_DAILY_REWARDS_USD } from "../rules/budget"
 import { computeFee } from "../rules/fee";
 import { checkSchedule } from "../rules/schedule";
 
-/**
- * Reads our database only, without asking Merkl whether the opportunity
- * exists: campaigns stay listable while Merkl is down. Unknown id → [].
- */
 export async function listCampaigns(opportunityId: string): Promise<Campaign[]> {
   return findCampaignsByOpportunity(opportunityId);
 }
@@ -31,7 +25,6 @@ export async function createCampaign(
   const opportunity = await fetchOpportunity(opportunityId);
   if (!opportunity) throw new NotFoundError("Opportunity", opportunityId);
 
-  // Reward tokens are looked up on the opportunity's chain.
   const token = await fetchToken(opportunity.chainId, input.tokenAddress);
   if (!token) {
     throw new RejectionError([
@@ -62,7 +55,6 @@ export async function createCampaign(
     ]);
   }
   if (!budget.ok) {
-    // Rounded down: a refused campaign must never read as "$100.00 a day".
     const dailyUsd = (Math.floor(budget.dailyRewardsUsd * 100) / 100).toFixed(2);
     throw new RejectionError([
       {
@@ -81,7 +73,7 @@ export async function createCampaign(
     tokenDecimals: token.decimals,
     amount,
     fee: computeFee(amount),
-    tokenPriceUsd: token.priceUsd as number, // non-null: BR-1 passed
+    tokenPriceUsd: token.priceUsd as number,
     startAt: input.startAt,
     endAt: input.endAt,
   });

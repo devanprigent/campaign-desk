@@ -1,5 +1,3 @@
-// Process entry point. Only decides how to serve: Vite middleware in dev,
-// built assets in prod. Everything app-specific lives in server/app.ts.
 import express from "express";
 
 const BUILD_PATH = "./build/server/index.js";
@@ -34,5 +32,4 @@ if (DEVELOPMENT) {
 }
 
 app.listen(PORT, () => {
-  console.log(`Campaign Desk running on http://localhost:${PORT}`);
 });

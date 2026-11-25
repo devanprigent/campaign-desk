@@ -1,5 +1,3 @@
-// Maps errors thrown by any layer to a JSON response. The only place in the
-// API that decides status codes for errors.
 import type { ErrorRequestHandler, RequestHandler } from "express";
 import { z } from "zod";
 
@@ -12,7 +10,6 @@ export const notFoundHandler: RequestHandler = (req, res) => {
 };
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  // Thrown by schema.parse() in controllers: the input is malformed.
   if (error instanceof z.ZodError) {
     res.status(400).json({
       error: { code: "validation_error", message: "Invalid request", fields: toFieldErrors(error) },
@@ -35,7 +32,6 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     });
     return;
   }
-  // Malformed JSON body, rejected by express.json() before any controller.
   if (error?.type === "entity.parse.failed") {
     res.status(400).json({ error: { code: "invalid_json", message: "Body is not valid JSON" } });
     return;

@@ -1,4 +1,3 @@
-// Token use cases: the reward tokens offered by the campaign form.
 import { fetchRewardTokens } from "../clients/merkl";
 import type { Token } from "../models/token";
 

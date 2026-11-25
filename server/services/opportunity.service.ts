@@ -1,5 +1,3 @@
-// Opportunity use cases. Callers (API controllers, React Router loaders)
-// go through here and never call the Merkl client directly.
 import { fetchOpportunities, fetchOpportunity } from "../clients/merkl";
 import { NotFoundError } from "../errors";
 import type {

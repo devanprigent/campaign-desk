@@ -1,5 +1,3 @@
-// Mounts the API sub-routers, then the JSON 404 and error handlers so that
-// /api never falls through to the HTML pages.
 import express, { Router } from "express";
 
 import { errorHandler, notFoundHandler } from "./error-handler";
@@ -9,7 +7,6 @@ import { opportunitiesRoutes } from "./routes/opportunities.routes";
 
 export const apiRouter = Router();
 
-// Inside the router so that malformed JSON reaches errorHandler below.
 apiRouter.use(express.json());
 
 apiRouter.get("/health", (_req, res) => {

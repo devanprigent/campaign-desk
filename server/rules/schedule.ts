@@ -1,5 +1,3 @@
-// Campaign dates: the campaign cannot start in the past and must end after it
-// starts. `now` is a parameter so the rule stays pure and testable.
 import type { FieldError } from "../errors";
 
 export function checkSchedule(startAt: Date, endAt: Date, now: Date): FieldError[] {

@@ -1,4 +1,3 @@
-// Wiring only: method + path → controller.
 import { Router } from "express";
 
 import * as opportunitiesController from "../controllers/opportunities.controller";

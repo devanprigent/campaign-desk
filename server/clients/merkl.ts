@@ -1,6 +1,3 @@
-// Read-only access to Merkl's public API: HTTP call, timeout and validation of
-// the response (schemas/merkl.schema.ts), through the caches of merkl.cache.ts.
-// No business rules here.
 import { z } from "zod";
 
 import { MerklUnavailableError } from "../errors";
@@ -28,11 +25,6 @@ import {
 const MERKL_API_URL = "https://api.merkl.xyz/v4";
 const REQUEST_TIMEOUT_MS = 3_000;
 
-/**
- * GET a Merkl endpoint and validate the body with `schema`. Network errors,
- * timeouts, 5xx and responses that do not match the schema are all
- * MerklUnavailableError: an unusable answer is treated like no answer.
- */
 async function getJson<S extends z.ZodType>(
   path: string,
   query: URLSearchParams,
@@ -57,7 +49,7 @@ async function getJson<S extends z.ZodType>(
     });
   } catch (error) {
     console.warn(`Merkl ${path} failed:`, error);
-    throw new MerklUnavailableError(error); // network error or timeout
+    throw new MerklUnavailableError(error);
   }
   if (response.status >= 500) {
     console.warn(`Merkl ${path} responded ${response.status}`);
@@ -65,7 +57,6 @@ async function getJson<S extends z.ZodType>(
   }
   if (response.status === 404 && options?.notFoundAsNull) return null;
   if (!response.ok) {
-    // A 4xx means we built a bad request: a bug on our side, not an outage.
     throw new Error(`Merkl rejected ${path}?${query}: ${response.status} ${await response.text()}`);
   }
 
@@ -84,10 +75,6 @@ async function getJson<S extends z.ZodType>(
   return parsed.data;
 }
 
-/**
- * Fetches one page of opportunities. Asks Merkl for `pageSize + 1` items so the
- * caller knows whether a next page exists without a separate count request.
- */
 export async function fetchOpportunities(
   filters: OpportunityFilters,
   { page, pageSize }: Pagination,
@@ -100,7 +87,7 @@ export async function fetchOpportunities(
   if (filters.action !== undefined) query.set("action", filters.action);
   if (filters.status !== undefined) query.set("status", filters.status);
   if (filters.minTvlUsd !== undefined) query.set("minimumTvl", String(filters.minTvlUsd));
-  query.sort(); // same filters in any order → same cache key
+  query.sort();
 
   const opportunities = await opportunityListCache.getOrLoad(query.toString(), () =>
     getJson("/opportunities", query, z.array(merklOpportunitySchema)),
@@ -111,7 +98,6 @@ export async function fetchOpportunities(
   };
 }
 
-/** One opportunity by Merkl id, or null if Merkl does not know it. */
 export async function fetchOpportunity(id: string): Promise<Opportunity | null> {
   return opportunityCache.getOrLoad(id, () =>
     getJson(`/opportunities/${encodeURIComponent(id)}`, new URLSearchParams(), merklOpportunitySchema, {
@@ -126,11 +112,6 @@ export async function fetchChains(): Promise<Chain[]> {
   );
 }
 
-/**
- * A token by chain and address, or null if Merkl does not know it. Merkl can
- * return several entries for one address (different casing); the verified one
- * wins.
- */
 export async function fetchToken(chainId: number, address: string): Promise<Token | null> {
   const query = new URLSearchParams({ chainId: String(chainId), address });
   const entries = await tokenCache.getOrLoad(`${chainId}:${address.toLowerCase()}`, () =>
@@ -139,7 +120,6 @@ export async function fetchToken(chainId: number, address: string): Promise<Toke
   return (entries.find((e) => e.verified) ?? entries[0])?.token ?? null;
 }
 
-/** Tokens Merkl accepts as campaign rewards on a chain, one per address. */
 export async function fetchRewardTokens(chainId: number): Promise<Token[]> {
   const entries = await rewardTokensCache.getOrLoad(String(chainId), () =>
     getJson(`/tokens/reward/${chainId}`, new URLSearchParams(), z.array(merklTokenSchema)),

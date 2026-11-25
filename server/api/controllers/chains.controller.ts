@@ -1,4 +1,3 @@
-// HTTP ↔ use case translation for chains.
 import type { Request, Response } from "express";
 
 import { listChains } from "../../services/chain.service";

@@ -7,8 +7,6 @@ datasource db {
   provider = "sqlite"
 }
 
-// A reward campaign created on a Merkl opportunity. Opportunity and token data
-// stay at Merkl; we only keep what is needed to show and explain the campaign.
 model Campaign {
   id            String   @id @default(uuid())
   opportunityId String
@@ -16,11 +14,8 @@ model Campaign {
   tokenAddress  String
   tokenSymbol   String
   tokenDecimals Int
-  // Integers in the token's smallest unit, stored as text: they can exceed
-  // SQLite's 64-bit integers (18-decimal tokens).
   amount        String
   fee           String
-  // Merkl price used to accept the campaign (BR-1), kept for auditability.
   tokenPriceUsd Float
   startAt       DateTime
   endAt         DateTime

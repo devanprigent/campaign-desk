@@ -1,6 +1,3 @@
-// Opportunity list page. The loader is this page's controller: it reads the
-// URL, uses the same schema and services as the JSON API, and returns data.
-// Filters and pagination live in the URL, so the page works without JS.
 import { Form, Link, useSubmit } from "react-router";
 
 import { MerklUnavailableError, toFieldErrors } from "../../server/errors";
@@ -24,8 +21,6 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const query: Query = Object.fromEntries(new URL(request.url).searchParams);
-  // Started in parallel; if Merkl's chain list fails, the chain filter
-  // falls back to a plain number input instead of breaking the page.
   const chains = listChains().catch(() => null);
   const result = loadOpportunities(query);
   return { query, chains: await chains, result: await result };
@@ -76,8 +71,6 @@ export default function Opportunities({ loaderData }: Route.ComponentProps) {
 function Filters({ query, chains }: { query: Query; chains: Chain[] | null }) {
   const submit = useSubmit();
 
-  // Any change reloads the page with the new filters, dropping empty fields
-  // and the page number (a new filter starts again at page 1).
   function handleChange(event: React.ChangeEvent<HTMLFormElement>) {
     const params = new URLSearchParams();
     for (const [name, value] of new FormData(event.currentTarget)) {
@@ -86,8 +79,6 @@ function Filters({ query, chains }: { query: Query; chains: Chain[] | null }) {
     submit(params, { method: "get" });
   }
 
-  // key: remount when the URL changes, so the fields show the current filters
-  // after a client-side navigation (defaultValue is only read on mount).
   return (
     <Form method="get" key={new URLSearchParams(query).toString()} onChange={handleChange}>
       <label>
@@ -128,7 +119,6 @@ function Filters({ query, chains }: { query: Query; chains: Chain[] | null }) {
         </select>
       </label>{" "}
       {query.pageSize && <input type="hidden" name="pageSize" value={query.pageSize} />}
-      {/* Without JS, onChange never fires: this button keeps the form usable. */}
       <noscript>
         <button type="submit">Apply</button>
       </noscript>
@@ -146,7 +136,6 @@ function Pagination({ query, page, hasNextPage }: { query: Query; page: number; 
   );
 }
 
-// Same URL with only the page changed, so filters are kept across pages.
 function pageHref(query: Query, page: number): string {
   const params = new URLSearchParams(query);
   if (page === 0) params.delete("page");

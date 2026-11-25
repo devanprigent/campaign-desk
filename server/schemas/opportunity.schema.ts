@@ -1,11 +1,8 @@
-// Shape of the opportunity list query (?chainId=…&action=…&status=…&minTvl=…
-// &page=…&pageSize=…). Parses to { filters, pagination } ready for the service.
 import { z } from "zod";
 
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "../constants";
 import { OPPORTUNITY_ACTIONS, OPPORTUNITY_STATUSES } from "../models/opportunity";
 
-/** A query value: absent or "" → undefined; repeated (?a=1&a=2) → error. */
 function queryParam<T extends z.ZodType<unknown, string>>(schema: T) {
   return z.preprocess(
     (value) => (value === "" ? undefined : value),
@@ -31,7 +28,6 @@ const nonNegativeNumber = z
   .transform(Number)
   .pipe(z.number({ error: "must be a number >= 0" }).min(0, { error: "must be a number >= 0" }));
 
-/** Case-insensitive: "pool" → "POOL". */
 function oneOf<const T extends readonly [string, ...string[]]>(values: T) {
   return z
     .string()

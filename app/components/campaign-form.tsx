@@ -1,6 +1,3 @@
-// Campaign creation form. A plain HTML form posted to the page's action, so it
-// works before JavaScript loads; <details> opens it without JS too.
-// Errors from the action are shown next to the field they concern.
 import { Form, useNavigation } from "react-router";
 
 import type { FieldError } from "../../server/errors";
@@ -13,8 +10,8 @@ export type CampaignFormResult = {
 };
 
 type Props = {
-  tokens: Token[] | null; // null: Merkl's token list is unavailable
-  result: CampaignFormResult | undefined; // last refused submission, if any
+  tokens: Token[] | null;
+  result: CampaignFormResult | undefined;
 };
 
 export function CampaignForm({ tokens, result }: Props) {
@@ -24,7 +21,6 @@ export function CampaignForm({ tokens, result }: Props) {
   return (
     <details open={result !== undefined}>
       <summary>New campaign</summary>
-      {/* key: remount after a refused submission so fields show what was sent */}
       <Form method="post" key={JSON.stringify(values)} noValidate>
         {result?.formError && <p role="alert">{result.formError}</p>}
 
