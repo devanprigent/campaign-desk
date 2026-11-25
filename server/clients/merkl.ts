@@ -1,6 +1,7 @@
 // Read-only access to Merkl's public API: HTTP call, timeout, cache, and
 // mapping from Merkl's JSON to our types. No business rules here.
 import { TtlCache } from "../lib/cache";
+import type { Chain } from "../models/chain";
 import type {
   Opportunity,
   OpportunityFilters,
@@ -35,6 +36,14 @@ const opportunityListCache = new TtlCache<MerklOpportunity[]>({
   ttlMs: 60_000, // opportunities change slowly
   staleTtlMs: 60 * 60_000, // serve up to 1h old data while Merkl is down
   maxEntries: 500, // one entry per filters + page combination
+});
+
+type MerklChain = { id: number; name: string };
+
+const chainsCache = new TtlCache<MerklChain[]>({
+  ttlMs: 60 * 60_000, // chains are added rarely
+  staleTtlMs: 24 * 60 * 60_000,
+  maxEntries: 1,
 });
 
 async function getJson<T>(path: string, query: URLSearchParams): Promise<T> {
@@ -99,4 +108,11 @@ export async function fetchOpportunities(
     items: raw.slice(0, pageSize).map(toOpportunity),
     hasNextPage: raw.length > pageSize,
   };
+}
+
+export async function fetchChains(): Promise<Chain[]> {
+  const raw = await chainsCache.getOrLoad("all", () =>
+    getJson<MerklChain[]>("/chains", new URLSearchParams()),
+  );
+  return raw.map(({ id, name }) => ({ id, name }));
 }

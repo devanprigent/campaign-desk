@@ -3,6 +3,7 @@
 import { Router } from "express";
 
 import { errorHandler, notFoundHandler } from "./error-handler";
+import { chainsRoutes } from "./routes/chains.routes";
 import { opportunitiesRoutes } from "./routes/opportunities.routes";
 
 export const apiRouter = Router();
@@ -11,6 +12,7 @@ apiRouter.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+apiRouter.use("/chains", chainsRoutes);
 apiRouter.use("/opportunities", opportunitiesRoutes);
 
 apiRouter.use(notFoundHandler);

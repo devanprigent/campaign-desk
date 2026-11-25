@@ -1,0 +1,8 @@
+// Chain use cases: the list of chains offered by the chain filter.
+import { fetchChains } from "../clients/merkl";
+import type { Chain } from "../models/chain";
+
+export async function listChains(): Promise<Chain[]> {
+  const chains = await fetchChains();
+  return [...chains].sort((a, b) => a.name.localeCompare(b.name));
+}

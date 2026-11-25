@@ -23,6 +23,8 @@ dossier merkl au lieu de clients
 
 # What I Would Do Next
 
+Use a dependency for the table
+
 // Add more query parameters to filter ?
 
 // Add a layer repository ?
