@@ -1,7 +1,9 @@
-// Turns raw query values (strings from a URL) into typed inputs, collecting
-// one FieldError per invalid field. Usable by API controllers and page loaders.
+// Turns raw request input (query strings, JSON bodies) into typed inputs,
+// collecting one FieldError per invalid field. Checks shape only: business
+// rules live in rules/. Usable by API controllers and page loaders/actions.
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "../constants";
 import { ValidationError, type FieldError } from "../errors";
+import type { NewCampaignInput } from "../models/campaign";
 import {
   OPPORTUNITY_ACTIONS,
   OPPORTUNITY_STATUSES,
@@ -40,6 +42,49 @@ export function parseOpportunityListQuery(query: Record<string, unknown>): {
     filters: { chainId, action, status, minTvlUsd },
     pagination: { page, pageSize },
   };
+}
+
+const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
+const UNSIGNED_INTEGER_PATTERN = /^\d+$/;
+
+/**
+ * Body of a campaign creation. `amount` is a string of digits in the token's
+ * smallest unit (a JSON number would lose precision above 2^53).
+ */
+export function parseCreateCampaignBody(body: unknown): NewCampaignInput {
+  const input = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  const errors: FieldError[] = [];
+
+  const tokenAddress = input.tokenAddress;
+  if (typeof tokenAddress !== "string" || !ADDRESS_PATTERN.test(tokenAddress)) {
+    errors.push({ field: "tokenAddress", message: "must be a 0x-prefixed 20-byte hex address" });
+  }
+
+  const amount = input.amount;
+  let amountUnits = 0n;
+  if (typeof amount !== "string" || !UNSIGNED_INTEGER_PATTERN.test(amount) || BigInt(amount) === 0n) {
+    errors.push({
+      field: "amount",
+      message: "must be a positive integer string in the token's smallest unit",
+    });
+  } else {
+    amountUnits = BigInt(amount);
+  }
+
+  const startAt = parseDate(input.startAt, "startAt", errors);
+  const endAt = parseDate(input.endAt, "endAt", errors);
+
+  if (errors.length > 0 || !startAt || !endAt) throw new ValidationError(errors);
+  return { tokenAddress: tokenAddress as string, amount: amountUnits, startAt, endAt };
+}
+
+function parseDate(value: unknown, field: string, errors: FieldError[]): Date | undefined {
+  const date = typeof value === "string" ? new Date(value) : undefined;
+  if (!date || Number.isNaN(date.getTime())) {
+    errors.push({ field, message: "must be an ISO 8601 date, e.g. 2026-12-01T00:00:00Z" });
+    return undefined;
+  }
+  return date;
 }
 
 export function parseInteger(

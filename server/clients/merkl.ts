@@ -2,6 +2,7 @@
 // mapping from Merkl's JSON to our types. No business rules here.
 import { TtlCache } from "../lib/cache";
 import type { Chain } from "../models/chain";
+import type { Token } from "../models/token";
 import type {
   Opportunity,
   OpportunityFilters,
@@ -46,7 +47,40 @@ const chainsCache = new TtlCache<MerklChain[]>({
   maxEntries: 1,
 });
 
-async function getJson<T>(path: string, query: URLSearchParams): Promise<T> {
+type MerklToken = {
+  chainId: number;
+  address: string;
+  symbol: string;
+  decimals: number;
+  verified?: boolean;
+  price?: number | null;
+};
+
+const opportunityCache = new TtlCache<MerklOpportunity | null>({
+  ttlMs: 60_000,
+  staleTtlMs: 60 * 60_000,
+  maxEntries: 500,
+});
+
+// BR-1 values a campaign at the token's *current* price: never serve a stale
+// price (staleTtlMs = ttlMs), refuse with MerklUnavailableError instead.
+const tokenCache = new TtlCache<MerklToken[]>({
+  ttlMs: 60_000,
+  staleTtlMs: 60_000,
+  maxEntries: 500,
+});
+
+async function getJson<T>(path: string, query: URLSearchParams): Promise<T>;
+async function getJson<T>(
+  path: string,
+  query: URLSearchParams,
+  options: { notFoundAsNull: true },
+): Promise<T | null>;
+async function getJson<T>(
+  path: string,
+  query: URLSearchParams,
+  options?: { notFoundAsNull: true },
+): Promise<T | null> {
   let response: Response;
   try {
     response = await fetch(`${MERKL_API_URL}${path}?${query}`, {
@@ -60,6 +94,7 @@ async function getJson<T>(path: string, query: URLSearchParams): Promise<T> {
     console.warn(`Merkl ${path} responded ${response.status}`);
     throw new MerklUnavailableError(new Error(`Merkl responded ${response.status}`));
   }
+  if (response.status === 404 && options?.notFoundAsNull) return null;
   if (!response.ok) {
     // A 4xx means we built a bad request: a bug on our side, not an outage.
     throw new Error(`Merkl rejected ${path}?${query}: ${response.status} ${await response.text()}`);
@@ -115,4 +150,37 @@ export async function fetchChains(): Promise<Chain[]> {
     getJson<MerklChain[]>("/chains", new URLSearchParams()),
   );
   return raw.map(({ id, name }) => ({ id, name }));
+}
+
+/** One opportunity by Merkl id, or null if Merkl does not know it. */
+export async function fetchOpportunity(id: string): Promise<Opportunity | null> {
+  const raw = await opportunityCache.getOrLoad(id, () =>
+    getJson<MerklOpportunity>(
+      `/opportunities/${encodeURIComponent(id)}`,
+      new URLSearchParams(),
+      { notFoundAsNull: true },
+    ),
+  );
+  return raw ? toOpportunity(raw) : null;
+}
+
+/**
+ * A token by chain and address, or null if Merkl does not know it. Merkl can
+ * return several entries for one address (different casing); the verified one
+ * wins.
+ */
+export async function fetchToken(chainId: number, address: string): Promise<Token | null> {
+  const query = new URLSearchParams({ chainId: String(chainId), address });
+  const entries = await tokenCache.getOrLoad(`${chainId}:${address.toLowerCase()}`, () =>
+    getJson<MerklToken[]>("/tokens", query),
+  );
+  const raw = entries.find((t) => t.verified) ?? entries[0];
+  if (!raw) return null;
+  return {
+    chainId: raw.chainId,
+    address: raw.address,
+    symbol: raw.symbol,
+    decimals: raw.decimals,
+    priceUsd: typeof raw.price === "number" ? raw.price : null,
+  };
 }
