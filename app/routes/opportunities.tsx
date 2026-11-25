@@ -1,10 +1,10 @@
 // Opportunity list page. The loader is this page's controller: it reads the
-// URL, calls the same parser and services as the JSON API, and returns data.
+// URL, uses the same schema and services as the JSON API, and returns data.
 // Filters and pagination live in the URL, so the page works without JS.
 import { Form, Link, useSubmit } from "react-router";
 
 import { MerklUnavailableError } from "../../server/clients/merkl";
-import { ValidationError } from "../../server/errors";
+import { toFieldErrors } from "../../server/errors";
 import type { Chain } from "../../server/models/chain";
 import {
   OPPORTUNITY_ACTIONS,
@@ -12,8 +12,8 @@ import {
   type Opportunity,
 } from "../../server/models/opportunity";
 import { listChains } from "../../server/services/chain.service";
+import { opportunityListQuerySchema } from "../../server/schemas/opportunity.schema";
 import { listOpportunities } from "../../server/services/opportunity.service";
-import { parseOpportunityListQuery } from "../../server/utils/parser";
 import { formatApr, formatUsd } from "../utils/format";
 import type { Route } from "./+types/opportunities";
 
@@ -33,14 +33,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 async function loadOpportunities(query: Query) {
+  const parsed = opportunityListQuerySchema.safeParse(query);
+  if (!parsed.success) return { status: "invalid" as const, fields: toFieldErrors(parsed.error) };
   try {
-    const { filters, pagination } = parseOpportunityListQuery(query);
-    const page = await listOpportunities(filters, pagination);
+    const page = await listOpportunities(parsed.data.filters, parsed.data.pagination);
     return { status: "ok" as const, page };
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return { status: "invalid" as const, fields: error.fields };
-    }
     if (error instanceof MerklUnavailableError) {
       return { status: "unavailable" as const };
     }

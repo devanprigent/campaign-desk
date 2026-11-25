@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 
 import type { Campaign } from "../../models/campaign";
 import { createCampaign, listCampaigns } from "../../services/campaign.service";
-import { parseCreateCampaignBody } from "../../utils/parser";
+import { createCampaignBodySchema } from "../../schemas/campaign.schema";
 
 export async function list(req: Request<{ opportunityId: string }>, res: Response): Promise<void> {
   const campaigns = await listCampaigns(req.params.opportunityId);
@@ -12,7 +12,7 @@ export async function list(req: Request<{ opportunityId: string }>, res: Respons
 }
 
 export async function create(req: Request<{ opportunityId: string }>, res: Response): Promise<void> {
-  const input = parseCreateCampaignBody(req.body);
+  const input = createCampaignBodySchema.parse(req.body);
   const campaign = await createCampaign(req.params.opportunityId, input);
   res.status(201).json({ campaign: toJson(campaign) });
 }

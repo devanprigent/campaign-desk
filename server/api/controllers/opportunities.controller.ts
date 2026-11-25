@@ -3,10 +3,10 @@
 import type { Request, Response } from "express";
 
 import { getOpportunity, listOpportunities } from "../../services/opportunity.service";
-import { parseOpportunityListQuery } from "../../utils/parser";
+import { opportunityListQuerySchema } from "../../schemas/opportunity.schema";
 
 export async function list(req: Request, res: Response): Promise<void> {
-  const { filters, pagination } = parseOpportunityListQuery(req.query);
+  const { filters, pagination } = opportunityListQuerySchema.parse(req.query);
   res.json(await listOpportunities(filters, pagination));
 }
 

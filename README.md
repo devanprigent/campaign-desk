@@ -17,6 +17,8 @@ dossier merkl au lieu de clients
 
 98 lignes de controlleurs contenant de la logique du genre parsing
 
+used custom parsing methods instead of using a tested external library like Zod.
+
 # My Feature
 
 // What I built and why I picked it

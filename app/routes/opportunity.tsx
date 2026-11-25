@@ -1,16 +1,16 @@
 // Opportunity page: Merkl data for one opportunity, the campaigns created on
 // it, and the form to create one. The loader and the action are this page's
-// controllers: they call the same parser and services as the JSON API.
+// controllers: they use the server's schemas and the same services as the JSON API.
 import { data, Link, redirect } from "react-router";
 
 import { MerklUnavailableError } from "../../server/clients/merkl";
-import { NotFoundError, RejectionError, ValidationError } from "../../server/errors";
+import { NotFoundError, RejectionError, toFieldErrors } from "../../server/errors";
 import type { Campaign } from "../../server/models/campaign";
 import type { Opportunity } from "../../server/models/opportunity";
+import { createCampaignFormSchema } from "../../server/schemas/campaign.schema";
 import { createCampaign, listCampaigns } from "../../server/services/campaign.service";
 import { getOpportunity } from "../../server/services/opportunity.service";
 import { listRewardTokens } from "../../server/services/token.service";
-import { parseCreateCampaignForm } from "../../server/utils/parser";
 import { CampaignForm, type CampaignFormResult } from "../components/campaign-form";
 import { formatApr, formatDateTime, formatUnits, formatUsd } from "../utils/format";
 import type { Route } from "./+types/opportunity";
@@ -43,14 +43,17 @@ export async function action({ params, request }: Route.ActionArgs) {
   for (const [name, value] of await request.formData()) {
     if (typeof value === "string") values[name] = value;
   }
+  const parsed = createCampaignFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return data<CampaignFormResult>({ values, fields: toFieldErrors(parsed.error) }, { status: 400 });
+  }
   try {
-    const campaign = await createCampaign(params.opportunityId, parseCreateCampaignForm(values));
+    const campaign = await createCampaign(params.opportunityId, parsed.data);
     // Post/Redirect/Get: a refresh will not submit the form again.
     return redirect(`/opportunities/${params.opportunityId}?created=${campaign.id}`);
   } catch (error) {
-    if (error instanceof ValidationError || error instanceof RejectionError) {
-      const status = error instanceof ValidationError ? 400 : 422;
-      return data<CampaignFormResult>({ values, fields: error.fields }, { status });
+    if (error instanceof RejectionError) {
+      return data<CampaignFormResult>({ values, fields: error.fields }, { status: 422 });
     }
     if (error instanceof MerklUnavailableError) {
       const formError = "Merkl is unavailable: the token price cannot be checked. Try again in a moment.";
