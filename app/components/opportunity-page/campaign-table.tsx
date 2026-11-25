@@ -8,9 +8,9 @@ export function CampaignTable({ campaigns }: { campaigns: Campaign[] }) {
       <thead>
         <tr>
           <th>Token</th>
-          <th>Amount</th>
-          <th>Fee (3%)</th>
-          <th>Total cost</th>
+          <th className="num">Amount</th>
+          <th className="num">Fee (3%)</th>
+          <th className="num">Total cost</th>
           <th>Start</th>
           <th>End</th>
           <th>Created</th>
@@ -20,9 +20,9 @@ export function CampaignTable({ campaigns }: { campaigns: Campaign[] }) {
         {campaigns.map((c) => (
           <tr key={c.id}>
             <td>{c.tokenSymbol}</td>
-            <td>{formatUnits(c.amount, c.tokenDecimals)}</td>
-            <td>{formatUnits(c.fee, c.tokenDecimals)}</td>
-            <td>{formatUnits(c.totalCost, c.tokenDecimals)}</td>
+            <td className="num">{formatUnits(c.amount, c.tokenDecimals)}</td>
+            <td className="num">{formatUnits(c.fee, c.tokenDecimals)}</td>
+            <td className="num">{formatUnits(c.totalCost, c.tokenDecimals)}</td>
             <td>{formatDateTime(c.startAt)}</td>
             <td>{formatDateTime(c.endAt)}</td>
             <td>{formatDateTime(c.createdAt)}</td>

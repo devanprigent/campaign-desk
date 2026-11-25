@@ -14,9 +14,9 @@ export function OpportunityTable({ items }: { items: Opportunity[] }) {
           <th>Protocol</th>
           <th>Action</th>
           <th>Status</th>
-          <th>TVL</th>
-          <th>APR</th>
-          <th>Daily rewards</th>
+          <th className="num">TVL</th>
+          <th className="num">APR</th>
+          <th className="num">Daily rewards</th>
         </tr>
       </thead>
       <tbody>
@@ -28,10 +28,12 @@ export function OpportunityTable({ items }: { items: Opportunity[] }) {
             <td>{o.chainName}</td>
             <td>{o.protocolName ?? "—"}</td>
             <td>{o.action}</td>
-            <td>{o.status}</td>
-            <td>{formatUsd(o.tvlUsd)}</td>
-            <td>{formatApr(o.apr)}</td>
-            <td>{formatUsd(o.dailyRewardsUsd)}</td>
+            <td>
+              <span className={`badge badge-${o.status.toLowerCase()}`}>{o.status}</span>
+            </td>
+            <td className="num">{formatUsd(o.tvlUsd)}</td>
+            <td className="num">{formatApr(o.apr)}</td>
+            <td className="num">{formatUsd(o.dailyRewardsUsd)}</td>
           </tr>
         ))}
       </tbody>
