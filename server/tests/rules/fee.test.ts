@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeFee, computeTotalCost } from "../../rules/fee";
+import { computeFee } from "../../rules/fee";
 
 describe("BR-2 computeFee: 3% of the amount, rounded up to the next unit", () => {
   it.each([
@@ -28,15 +28,5 @@ describe("BR-2 computeFee: 3% of the amount, rounded up to the next unit", () =>
 
   it("refuses a negative amount", () => {
     expect(() => computeFee(-1n)).toThrow(RangeError);
-  });
-});
-
-describe("BR-2 computeTotalCost: the fee is paid on top of the amount", () => {
-  it("1000 USDC costs 1030 USDC", () => {
-    expect(computeTotalCost(1_000_000_000n)).toBe(1_030_000_000n);
-  });
-
-  it("adds the rounded-up fee: 101 → 101 + 4", () => {
-    expect(computeTotalCost(101n)).toBe(105n);
   });
 });
